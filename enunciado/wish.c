@@ -4,48 +4,33 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-// Funcion para determinar el tamaño de la lista de items
-int tamano_items(char **items) {
-    int tamano = 0;
-    // Iterar sobre el array hasta encontrar un puntero nulo
-    while (items[tamano] != NULL) {
-        tamano++;
-    }
-    return tamano;
+// Global variables
+const char *mypath[] = {
+  "./",
+  "/usr/bin/",
+  "/bin/",
+  NULL
+};
+
+char *builtin_commands[] = { 
+    "exit",
+    "cd",
+    "path",
+    NULL 
+};
+
+char *external_commands[] = {
+    "ls",
+    NULL 
+};
+
+// Utility functions
+void print_error(){
+    char error_message[30] = "An error has occurred\n";
+    write(STDERR_FILENO, error_message, strlen(error_message)); 
 }
 
-/*
-    Funcion para manejar cd
-    Test 4: Input to run misc. commands. (cd before ls)
-*/
-void cd(char *args) {
-    if(chdir(args) != 0){
-        // Test 1 and 2: Input to check bad cd. No arguments or 2 arguments are passed to cd.
-        fprintf(stderr, "An error has occurred\n");
-    }
-}
-
-// Otras funciones de comandos internos...
-
-/*
-    Funcion para ejecutar comandos externos
-    -ls (Test 3: ls with a bad directory name. Test 4: Run ls after cd)
-*/
-void ejecutar_externo(char *comando, char **args) {
-    if (fork() == 0) {
-        // Proceso hijo
-        // Ejecutar el comando externo
-        execvp(comando, args);
-        
-        exit(EXIT_FAILURE);
-    } else {
-        // Proceso padre
-        // Esperar a que el hijo termine
-        wait(NULL);
-    }
-}
-
-int separaItems(char *expresion, char ***items, int *background) {
+int parse_input(char *expresion, char ***items, int *background){
     // Número máximo de tokens esperados
     int max_tokens = 64;
     // Delimitador para separar la cadena en tokens
@@ -58,7 +43,7 @@ int separaItems(char *expresion, char ***items, int *background) {
     char **tokens = (char **)malloc(max_tokens * sizeof(char *));
 
     if (tokens == NULL) {
-        fprintf(stderr, "Error: No se pudo asignar memoria para almacenar los tokens.\n");
+        fprintf(stderr, "Error: Could not assign memory for token.\n");
         exit(EXIT_FAILURE);
     }
 
@@ -78,7 +63,7 @@ int separaItems(char *expresion, char ***items, int *background) {
 
         // Verificar si se superó el número máximo de tokens
         if (num_tokens >= max_tokens) {
-            fprintf(stderr, "Advertencia: Se ha superado el número máximo de tokens permitidos.\n");
+            fprintf(stderr, "Warning: Max allowed tokens reached.\n");
             break; // Salir del bucle
         }
 
@@ -96,30 +81,78 @@ int separaItems(char *expresion, char ***items, int *background) {
     return num_tokens;
 }
 
-int main(int argc, char *argv[]) {
-    const char *mypath[] = {
-        "./",
-        "/usr/bin/",
-        "/bin/",
-        NULL
-    };
+int list_contains(char *str, char **list) {
+    int i = 0;
+    while (list[i] != NULL) {
+        if (strcmp(list[i], str) == 0) {
+            return 1;
+        }
+        i++;
+    }
+    return 0;
+}
 
+int items_size(char **items) {
+    int size = 0;
+    // Iterar sobre el array hasta encontrar un puntero nulo
+    while (items[size] != NULL) {
+        size++;
+    }
+    return size;
+}
+
+// Handle commands functions
+void handle_builtin_commands(char **items){
+    if (strcmp(items[0], "exit") == 0) {
+        // Test 5: Tries to exit with an argument. Should throw an error. (Exit con más de un argumento)
+        if(items_size(items) > 1){
+            fprintf(stderr, "An error has occurred\n");
+        } else {
+            exit(0);
+        }
+    } else if (strcmp(items[0], "cd") == 0) {
+        if(chdir(items[1]) != 0){
+            // Test 1 and 2: Input to check bad cd. No arguments or 2 arguments are passed to cd.
+            fprintf(stderr, "An error has occurred\n");
+        }
+    } else if (strcmp(items[0], "path") == 0) {
+        fprintf(stderr, "Path still not created\n");
+    }
+}
+
+void handle_external_commands(char **items){
+    char *command = items[0];
+
+    if (fork() == 0) {
+        // Proceso hijo
+        // Ejecutar el comando externo
+        execvp(command, items);
+        
+        exit(EXIT_FAILURE);
+    } else {
+        // Proceso padre
+        // Esperar a que el hijo termine
+        wait(NULL);
+    }
+}
+
+int main(int argc, char *argv[]){
     char expresion[256]; // Tamaño de la entrada
     char **items;
     int num, background;
 
     FILE *input_stream = stdin;
 
-    if (argc == 2) {
+    if(argc == 2){
         input_stream = fopen(argv[1], "r");
         if (!input_stream) {
             exit(1);
         }
-    } else if (argc > 2) {
+    } else if(argc > 2) {
         exit(1);
     }
 
-    while (1) {
+    while(1){
         // Verificar si estamos leyendo desde un archivo
         if (input_stream == stdin) {
             printf("wish> ");
@@ -133,28 +166,18 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // Parse input
-        num = separaItems(expresion, &items, &background);
+        num = parse_input(expresion, &items, &background);
 
-        if(strcmp(items[0], "exit") == 0) {
-            // Test 5: Tries to exit with an argument. Should throw an error. (Exit con más de un argumento)
-            if(tamano_items(items) > 1){
-                fprintf(stderr, "An error has occurred\n");
-            } else {
-                break;
-            }
-        } else if (strcmp(items[0], "cd") == 0) {
-            cd(items[1]);
-        } else if (strcmp(items[0], "ordenN") == 0) {
-            // Lanzar el ejecutable asociado a la orden N
-            // Codigo: suponiendo que es interna…
-       
-        } else {
-            // Ejecutar comando externo
-            ejecutar_externo(items[0], items);
+        if(list_contains(items[0], builtin_commands)){
+            handle_builtin_commands(items);
+        } else if (list_contains(items[0], external_commands)){
+            handle_external_commands(items);
+        } else  {
+            fprintf(stderr, "Command not found\n");
         }
     }
-
-
-    return 0;
 }
+
+/*if (file_in_path(items[0])){
+            fprintf(stderr, "Still not created");
+        } else*/
