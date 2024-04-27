@@ -4,6 +4,16 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+// Funcion para determinar el tamaño de la lista de items
+int tamano_items(char **items) {
+    int tamano = 0;
+    // Iterar sobre el array hasta encontrar un puntero nulo
+    while (items[tamano] != NULL) {
+        tamano++;
+    }
+    return tamano;
+}
+
 /*
     Funcion para manejar cd
     Test 4: Input to run misc. commands. (cd before ls)
@@ -126,12 +136,14 @@ int main(int argc, char *argv[]) {
         // Parse input
         num = separaItems(expresion, &items, &background);
 
-        if(strcmp(items[0], "exit") == 0){
-            break;
-        }
-
-        // Obtener comando
-        if (strcmp(items[0], "cd") == 0) {
+        if(strcmp(items[0], "exit") == 0) {
+            // Test 5: Tries to exit with an argument. Should throw an error. (Exit con más de un argumento)
+            if(tamano_items(items) > 1){
+                fprintf(stderr, "An error has occurred\n");
+            } else {
+                break;
+            }
+        } else if (strcmp(items[0], "cd") == 0) {
             cd(items[1]);
         } else if (strcmp(items[0], "ordenN") == 0) {
             // Lanzar el ejecutable asociado a la orden N
