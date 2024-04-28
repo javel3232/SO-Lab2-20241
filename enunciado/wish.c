@@ -3,12 +3,21 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <string.h>
 
 // Global variables
 const char *mypath[] = {
   "./",
   "/usr/bin/",
   "/bin/",
+  NULL
+};
+
+char *local_path[] = {
+  "./",
+  "/usr/bin/",
+  "/bin/",
+  "tests/",
   NULL
 };
 
@@ -92,7 +101,7 @@ int list_contains(char *str, char **list) {
     return 0;
 }
 
-int items_size(char **items) {
+int count_elements(char **items) {
     int size = 0;
     // Iterar sobre el array hasta encontrar un puntero nulo
     while (items[size] != NULL) {
@@ -105,15 +114,15 @@ int items_size(char **items) {
 void handle_builtin_commands(char **items){
     if (strcmp(items[0], "exit") == 0) {
         // Test 5: Tries to exit with an argument. Should throw an error. (Exit con más de un argumento)
-        if(items_size(items) > 1){
-            fprintf(stderr, "An error has occurred\n");
+        if(count_elements(items) > 1){
+            print_error();
         } else {
             exit(0);
         }
     } else if (strcmp(items[0], "cd") == 0) {
         if(chdir(items[1]) != 0){
             // Test 1 and 2: Input to check bad cd. No arguments or 2 arguments are passed to cd.
-            fprintf(stderr, "An error has occurred\n");
+            print_error();
         }
     } else if (strcmp(items[0], "path") == 0) {
         fprintf(stderr, "Path still not created\n");
@@ -128,7 +137,7 @@ void handle_external_commands(char **items){
         // Ejecutar el comando externo
         execvp(command, items);
         
-        exit(EXIT_FAILURE);
+        print_error();
     } else {
         // Proceso padre
         // Esperar a que el hijo termine
@@ -173,11 +182,8 @@ int main(int argc, char *argv[]){
         } else if (list_contains(items[0], external_commands)){
             handle_external_commands(items);
         } else  {
-            fprintf(stderr, "Command not found\n");
+            print_error();
         }
     }
 }
 
-/*if (file_in_path(items[0])){
-            fprintf(stderr, "Still not created");
-        } else*/
