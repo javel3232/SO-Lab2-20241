@@ -238,14 +238,20 @@ int main(int argc, char *argv[]){
             break;
         }
 
+        // Separar la entrada en items
         items = parse_input(expression);
 
+        int pids;
+        // Verificar si los items tienen una redireccion válida
         redir = is_valid_redirection(items);
         if (redir) {
+            // Intentar ejecutar un comando interno (revisar si es un comando interno)
             in_exec = handle_builtin_commands(items);
 
+            // En caso contrario intentar ejecutar un externo
             if(in_exec == 0){
-                handle_external_commands(items);
+                pids = handle_external_commands(items);
+                waitpid(pids, NULL, 0);
             }        
         } else {
             print_error();
