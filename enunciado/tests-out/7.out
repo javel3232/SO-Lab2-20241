@@ -5,3 +5,4 @@ tests
 tests-out
 wish
 wish.c
+wish_indu.c

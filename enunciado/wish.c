@@ -1,37 +1,67 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <string.h>
 
-// Global variables
-const char *mypath[] = {
-  "./",
-  "/usr/bin/",
-  "/bin/",
-  NULL
-};
+//  Creación de una estructura vector para facilitar el trabajo
+#define VECTOR_CAPACITY 100
 
-char *local_path[] = {
-  "./",
-  "/usr/bin/",
-  "/bin/",
-  "tests/",
-  NULL
-};
+typedef struct Vector{
+    char **data;
+    int capacity;
+    int size;
+} Vector;
 
-char *builtin_commands[] = { 
-    "exit",
-    "cd",
-    "path",
-    NULL 
-};
+Vector vector_create() {
+    Vector v;
+    v.data = (char**) malloc (VECTOR_CAPACITY * sizeof(char*));
+    v.capacity = VECTOR_CAPACITY;
+    v.size = 0;
+    return v;
+}
 
-char *external_commands[] = {
-    "ls",
-    NULL 
-};
+void vector_add(Vector* v, char *str){
+    if (v->capacity == v->size) {
+        char** new_data = (char**) malloc( (v->capacity << 1) * sizeof(char*) );
+        int n = v->size;
+        for (int i = 0; i < n; i++) new_data[i] = v->data[i];
+        free(v->data);
+        v->data = new_data;
+        v-> capacity <<= 1;
+    }
+    v->data[v->size++] = str;
+}
+
+void vector_remove_last(Vector* v){
+    if (v->size > 0) v->size--;
+}
+
+char *vector_get(Vector* v, int index){
+    if (index < 0 || index >= v->size) return NULL;
+    return v->data[index];
+}
+
+int vector_get_size(Vector *v){
+    return v->size;
+}
+
+int vector_get_index(Vector *v, char *val){
+    int n = v->size;
+    for(int i = 0; i < n; i++){
+        if (strcmp(val, v-> data[i]) == 0) return i;
+    }
+    return -1;
+}
+
+void vector_destroy(Vector *v){
+    free(v->data);
+}
+
+Vector PATH;
 
 // Utility functions
 void print_error(){
@@ -39,103 +69,51 @@ void print_error(){
     write(STDERR_FILENO, error_message, strlen(error_message)); 
 }
 
-int parse_input(char *expresion, char ***items, int *background){
-    // Número máximo de tokens esperados
-    int max_tokens = 64;
+Vector parse_input(char *expresion){
+    Vector items = vector_create();
+
     // Delimitador para separar la cadena en tokens
     const char *delimitador = " \t\n";
     // Variable para almacenar cada token individual
     char *token;
-    // Contador de tokens
-    int num_tokens = 0;
-    // Puntero a un array de punteros que contendrá los tokens
-    char **tokens = (char **)malloc(max_tokens * sizeof(char *));
-
-    if (tokens == NULL) {
-        fprintf(stderr, "Error: Could not assign memory for token.\n");
-        exit(EXIT_FAILURE);
-    }
 
     // Obtener el primer token
     token = strtok(expresion, delimitador);
 
-    // Mientras haya tokens y no se supere el número máximo de tokens
-    while (token != NULL) {
-        // Verificar si el token es "&" para indicar que el comando debe ejecutarse en segundo plano
-        if (strcmp(token, "&") == 0) {
-            *background = 1; // Indicar que el comando debe ejecutarse en segundo plano
-            break; // Salir del bucle
-        }
-
-        // Almacenar el token actual en el array de tokens
-        tokens[num_tokens++] = strdup(token);
-
-        // Verificar si se superó el número máximo de tokens
-        if (num_tokens >= max_tokens) {
-            fprintf(stderr, "Warning: Max allowed tokens reached.\n");
-            break; // Salir del bucle
-        }
+    while(token != NULL){
+        vector_add(&items, token);
 
         // Obtener el siguiente token
         token = strtok(NULL, delimitador);
     }
 
-    // Agregar NULL al final del array de tokens para indicar el final de la lista
-    tokens[num_tokens] = NULL;
-
-    // Asignar el array de tokens a la dirección de memoria apuntada por items
-    *items = tokens;
-
-    // Retornar el número de tokens encontrados
-    return num_tokens;
+    return items;
 }
 
-int list_contains(char *str, char **list) {
-    int i = 0;
-    while (list[i] != NULL) {
-        if (strcmp(list[i], str) == 0) {
-            return 1;
-        }
-        i++;
-    }
-    return 0;
-}
-
-int count_elements(char **items) {
-    int size = 0;
-    // Iterar sobre el array hasta encontrar un puntero nulo
-    while (items[size] != NULL) {
-        size++;
-    }
-    return size;
-}
-
-// Handle commands functions
-void handle_builtin_commands(char **items){
-    if (strcmp(items[0], "exit") == 0) {
-        // Test 5: Tries to exit with an argument. Should throw an error. (Exit con más de un argumento)
-        if(count_elements(items) > 1){
-            print_error();
-        } else {
-            exit(0);
-        }
-    } else if (strcmp(items[0], "cd") == 0) {
-        if(chdir(items[1]) != 0){
-            // Test 1 and 2: Input to check bad cd. No arguments or 2 arguments are passed to cd.
-            print_error();
-        }
-    } else if (strcmp(items[0], "path") == 0) {
-        fprintf(stderr, "Path still not created\n");
+// Commands functions
+void my_exit(Vector items){
+    // Test 5: Tries to exit with an argument. Should throw an error. (Exit con más de un argumento)
+    if(items.size > 1){
+        print_error();
+    } else {
+        exit(0);
     }
 }
 
-void handle_external_commands(char **items){
-    char *command = items[0];
+void cd(Vector items){
+    if(chdir(vector_get(&items, 1)) != 0){
+        // Test 1 and 2: Input to check bad cd. No arguments or 2 arguments are passed to cd.
+        print_error();
+    }
+}
+
+void ls(Vector items){
+    char *command = vector_get(&items, 0);
 
     if (fork() == 0) {
         // Proceso hijo
         // Ejecutar el comando externo
-        execvp(command, items);
+        execvp(command, items.data);
         
         print_error();
     } else {
@@ -145,10 +123,42 @@ void handle_external_commands(char **items){
     }
 }
 
+void path(Vector items){
+    Vector new_path = vector_create();
+    for (int i = 1; i < items.size; i++){
+        vector_add(&new_path, vector_get(&items, i));
+    } 
+    PATH = new_path;
+}
+
+void handle_scripts(Vector items){
+    char *script = vector_get(&items, 0);
+    for(int i = 0; i < PATH.size; i++) {
+        char *dir = malloc(strlen(vector_get(&PATH, i)) + strlen(script) + 2); // Tamaño suficiente para almacenar la ruta completa
+        if (dir == NULL) {
+            perror("Error en malloc");
+            exit(EXIT_FAILURE);
+        }
+        snprintf(dir, strlen(vector_get(&PATH, i)) + strlen(script) + 2, "%s/%s", vector_get(&PATH, i), script);
+
+        // Verificar si el archivo existe
+        if (access(dir, X_OK) == 0) {
+            printf("El archivo '%s' existe en '%s'\n", script, vector_get(&PATH, i));
+        }
+        
+        free(dir); // Liberar memoria asignada
+    }
+
+    print_error();
+}
+
 int main(int argc, char *argv[]){
-    char expresion[256]; // Tamaño de la entrada
-    char **items;
-    int num, background;
+    char expression[256];
+    Vector items;
+
+    vector_add(&PATH, "./");
+    vector_add(&PATH, "/usr/bin/");
+    vector_add(&PATH, "/bin/");
 
     FILE *input_stream = stdin;
 
@@ -168,22 +178,28 @@ int main(int argc, char *argv[]){
         }
 
         // Leer la entrada
-        fgets(expresion, sizeof(expresion), input_stream);
+        fgets(expression, sizeof(expression), input_stream);
 
         // Verificar si se alcanzó el final del archivo (EOF)
         if (feof(input_stream)) {
             break;
         }
 
-        num = parse_input(expresion, &items, &background);
+        items = parse_input(expression);
 
-        if(list_contains(items[0], builtin_commands)){
-            handle_builtin_commands(items);
-        } else if (list_contains(items[0], external_commands)){
-            handle_external_commands(items);
-        } else  {
-            print_error();
+        if(strcmp(vector_get(&items, 0), "exit") == 0){
+            my_exit(items);
+        } else if (strcmp(vector_get(&items, 0), "cd") == 0) {
+            cd(items);
+        } else if (strcmp(vector_get(&items, 0), "ls") == 0) {
+            ls(items);
+        } else if (strcmp(vector_get(&items, 0), "path") == 0){
+            
+        } else {
+            handle_scripts(items);
         }
+
+        free(items.data);
     }
 }
 
