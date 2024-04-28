@@ -211,15 +211,26 @@ int main(int argc, char *argv[]){
     vector_add(&PATH, "/usr/bin/");
     vector_add(&PATH, "/bin/");
 
-    FILE *input_stream = stdin;
+    FILE *input_stream = NULL;
 
-    if(argc == 2){
-        input_stream = fopen(argv[1], "r");
-        if (!input_stream) {
+    for (int i = 1; i < argc; i++) {
+        FILE* aux_file = fopen(argv[i], "r");
+        if (aux_file == NULL) {
+            print_error();
             exit(1);
         }
-    } else if(argc > 2) {
-        exit(1);
+
+        if (input_stream == NULL) {
+            input_stream = aux_file;
+        } else {
+            struct stat in_stat, aux_stat;
+            fstat(fileno(input_stream), &in_stat);
+            fstat(fileno(aux_file), &aux_stat);
+            if (!(in_stat.st_dev == aux_stat.st_dev && in_stat.st_ino == aux_stat.st_ino)) {
+                print_error();
+                exit(1);
+            }
+        }
     }
 
     while(1){
