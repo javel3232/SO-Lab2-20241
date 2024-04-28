@@ -69,22 +69,35 @@ void print_error(){
     write(STDERR_FILENO, error_message, strlen(error_message)); 
 }
 
-Vector parse_input(char *expresion){
+int is_delimiter(char c){
+    if (c == ' ' ||  c == '\t' || c == '\n' || c == '>' || c == '&'){
+        return 1;
+    }
+    return 0;
+}
+
+Vector parse_input(char *expression){
     Vector items = vector_create();
 
-    // Delimitador para separar la cadena en tokens
-    const char *delimitador = " \t\n";
-    // Variable para almacenar cada token individual
-    char *token;
-
-    // Obtener el primer token
-    token = strtok(expresion, delimitador);
-
-    while(token != NULL){
-        vector_add(&items, token);
-
-        // Obtener el siguiente token
-        token = strtok(NULL, delimitador);
+    int n = strlen(expression);
+    char* s = NULL;
+    int start = -1;
+    for (int i = 0; i < n; i++) {
+        if (expression[i] == '>') {
+            vector_add(&items, ">");
+            continue;
+        }
+        if (expression[i] == '&') {
+            vector_add(&items, "&");
+            continue;
+        }
+        if (!is_delimiter(expression[i])) {
+            if (i == 0 || is_delimiter(expression[i-1])) start = i;
+            if (i == n-1 || is_delimiter(expression[i+1])) {
+                s = strndup(expression+start, i-start+1);
+                vector_add(&items, s);
+            }
+        }
     }
 
     return items;
@@ -126,14 +139,18 @@ int handle_builtin_commands(Vector items){
 int handle_external_commands(Vector items){
     char *command = vector_get(&items, 0);
     int pos = vector_get_index(&items, ">");
-    if (pos == -1) pos = items.size;
+    if (pos == -1) {
+        pos = items.size;
+    }
     for (int i = 0; i < PATH.size; i++) {
         char *p = (char*) malloc((strlen(vector_get(&PATH, i)) + strlen(command) + 1) * sizeof(char));
         snprintf(p, strlen(vector_get(&PATH, i)) + strlen(command) + 1, "%s%s", vector_get(&PATH, i), command);
         
         if (access(p, X_OK) == 0) {
             char* argv[pos+1];
-            for (int i = 0; i < pos; i++) argv[i] = vector_get(&items, i);
+            for (int i = 0; i < pos; i++){
+                argv[i] = vector_get(&items, i);
+            } 
             argv[pos] = NULL;
             
             int rc = fork();
@@ -167,11 +184,28 @@ char *search_script(char *filename){
     return NULL;
 }
 
+int is_valid_redirection (Vector items) {
+    int n = items.size;
+    for (int i = 0; i < n; i++) {
+        if (strcmp(">", vector_get(&items, i)) == 0) {
+            if (i == 0 || i == n-1 || n-1-i > 1){
+                return 0;
+            } 
+            if (i != n-1 && strcmp(">", vector_get(&items, i+1)) == 0){
+                return 0;
+            } 
+        }
+    }
+    return 1;
+}
+
+
 int main(int argc, char *argv[]){
     char expression[256];
     Vector items;
     char *filename;
     int in_exec;
+    int redir;
 
     vector_add(&PATH, "./");
     vector_add(&PATH, "/usr/bin/");
@@ -194,6 +228,8 @@ int main(int argc, char *argv[]){
             printf("wish> ");
         }
 
+        redir = -1;
+
         // Leer la entrada
         fgets(expression, sizeof(expression), input_stream);
 
@@ -204,12 +240,18 @@ int main(int argc, char *argv[]){
 
         items = parse_input(expression);
 
-        in_exec = handle_builtin_commands(items);
+        redir = is_valid_redirection(items);
+        if (redir) {
+            in_exec = handle_builtin_commands(items);
 
-        if(in_exec == 0){
-            handle_external_commands(items);
-        }        
+            if(in_exec == 0){
+                handle_external_commands(items);
+            }        
+        } else {
+            print_error();
+        }
 
+        
         vector_destroy(&items);
     }
 }
