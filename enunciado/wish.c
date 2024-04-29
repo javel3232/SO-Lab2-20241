@@ -8,7 +8,7 @@
 #include <string.h>
 
 //  Creación de una estructura vector para facilitar el trabajo
-#define VECTOR_CAPACITY 100
+#define VECTOR_CAPACITY 8
 
 typedef struct Vector{
     char **data;
@@ -143,10 +143,10 @@ int handle_external_commands(Vector items){
         pos = items.size;
     }
     for (int i = 0; i < PATH.size; i++) {
-        char *p = (char*) malloc((strlen(vector_get(&PATH, i)) + strlen(command) + 1) * sizeof(char));
-        snprintf(p, strlen(vector_get(&PATH, i)) + strlen(command) + 1, "%s%s", vector_get(&PATH, i), command);
+        char *dir = (char*) malloc((strlen(vector_get(&PATH, i)) + strlen(command) + 1) * sizeof(char));
+        snprintf(dir, strlen(vector_get(&PATH, i)) + strlen(command) + 1, "%s%s", vector_get(&PATH, i), command);
         
-        if (access(p, X_OK) == 0) {
+        if (access(dir, X_OK) == 0) {
             char* argv[pos+1];
             for (int i = 0; i < pos; i++){
                 argv[i] = vector_get(&items, i);
@@ -157,13 +157,9 @@ int handle_external_commands(Vector items){
             if (rc == 0) {
                 if (pos != items.size) {
                     close(STDOUT_FILENO);
-                    open(
-                        vector_get(&items, items.size - 1),
-                        O_CREAT | O_WRONLY | O_TRUNC,
-                        S_IRWXU
-                    );
+                    open(vector_get(&items, items.size - 1), O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
                 }
-                execv(p, argv);
+                execv(dir, argv);
             }
             return rc;
         }
@@ -199,17 +195,10 @@ int is_valid_redirection (Vector items) {
     return 1;
 }
 
-
 int main(int argc, char *argv[]){
-    char expression[256];
-    Vector items;
-    char *filename;
     int in_exec;
-    int redir;
-
-    vector_add(&PATH, "./");
-    vector_add(&PATH, "/usr/bin/");
-    vector_add(&PATH, "/bin/");
+    Vector items;
+    char *expression = NULL;
 
     FILE *input_stream = NULL;
 
@@ -233,43 +222,174 @@ int main(int argc, char *argv[]){
         }
     }
 
+    if(input_stream == NULL){
+        input_stream = stdin;
+    }
+
+    vector_add(&PATH, "./");
+    vector_add(&PATH, "/usr/bin/");
+    vector_add(&PATH, "/bin/");
+
     while(1){
         // Verificar si estamos leyendo desde un archivo
         if (input_stream == stdin) {
             printf("wish> ");
         }
 
-        redir = -1;
-
         // Leer la entrada
-        fgets(expression, sizeof(expression), input_stream);
+        size_t n = 0;
+        int in_len = getline(&expression, &n, input_stream);
+
+        if(in_len == -1){
+            if (input_stream == stdin){
+                continue;
+            } else {
+                break;
+            }
+        }
 
         // Verificar si se alcanzó el final del archivo (EOF)
         if (feof(input_stream)) {
             break;
         }
 
+        // Cambiar el último caracter por NULL
+        expression[in_len-1] = '\0';
+
         // Separar la entrada en items
         items = parse_input(expression);
 
-        int pids;
+        if(vector_get(&items, 0) == NULL){
+            continue;
+        }
+
         // Verificar si los items tienen una redireccion válida
-        redir = is_valid_redirection(items);
-        if (redir) {
+        if (is_valid_redirection(items)) {
             // Intentar ejecutar un comando interno (revisar si es un comando interno)
             in_exec = handle_builtin_commands(items);
 
+            int pids;
             // En caso contrario intentar ejecutar un externo
             if(in_exec == 0){
                 pids = handle_external_commands(items);
-                waitpid(pids, NULL, 0);
+                if(pids != -1){
+                    waitpid(pids, NULL, 0);
+                }
             }        
         } else {
             print_error();
         }
 
-        
+        free(expression);
         vector_destroy(&items);
     }
+
+    return 0;
 }
 
+/*
+int main (int argc, char* argv[]){
+    int in_exec;
+
+    FILE* input_file = NULL;
+    for (int i = 1; i < argc; i++) {
+        FILE* aux_file = fopen(argv[i], "r");
+        if (aux_file == NULL) {
+            print_error();
+            exit(1);
+        }
+
+        if (input_file == NULL) {
+            input_file = aux_file;
+        } else {
+            struct stat in_stat, aux_stat;
+            fstat(fileno(input_file), &in_stat);
+            fstat(fileno(aux_file), &aux_stat);
+            if (!(in_stat.st_dev == aux_stat.st_dev && in_stat.st_ino == aux_stat.st_ino)) {
+                print_error();
+                exit(1);
+            }
+        }
+    }
+
+    if (input_file != NULL) stdin = fdopen(fileno(input_file), "r");
+
+    vector_add(&PATH, "./");
+    vector_add(&PATH, "/usr/bin/");
+    vector_add(&PATH, "/bin/");
+
+        
+    while (1){
+        if (input_file == NULL) printf("wish> ");
+        char* line = NULL;
+        size_t n = 0;
+        int len = getline(&line, &n, stdin);
+        if (len == -1) {
+            if (input_file == NULL) continue;
+            break;
+        }
+        
+        line[len-1] = '\0';
+        Vector tokens = parse_input(line);
+        
+        int size = tokens.size;
+        int amper = 1;
+        for (int i = 0; i < size; i++) {
+            if (strcmp("&", vector_get(&tokens, i)) == 0) {
+                if (i == 0){
+                    amper = 0;
+                }
+                if (i != size-1 && strcmp("&", vector_get(&tokens, i+1)) == 0){
+                    amper = 0;
+                }
+            }
+        }
+
+        if (!amper) {
+            continue;
+        }   
+
+        int commandsCount = 1;
+        for (int i = 0; i < tokens.size; i++) {
+            if (strcmp("&", vector_get(&tokens, i)) == 0) commandsCount++;
+        }
+        Vector command = vector_create();
+        int processIds[commandsCount];
+        int sz = 0;
+        for (int i = 0; i < tokens.size; i++) {
+            if (strcmp("&", vector_get(&tokens, i)) != 0) {
+                vector_add(&command, vector_get(&tokens, i));
+            } else {
+                continue;
+            }
+            if (
+                i == tokens.size - 1 ||
+                strcmp("&", vector_get(&tokens, i+1)) == 0
+            ) {
+                if (!is_valid_redirection(command)) {
+                    // Intentar ejecutar un comando interno (revisar si es un comando interno)
+                    print_error();
+                    break;
+                }
+                in_exec = handle_builtin_commands(command);
+                int res = -1;
+                if(!in_exec){
+                    res = handle_external_commands(command);
+                }                 
+                if (res != -1){
+                    processIds[sz++] = res;
+                } 
+                command = vector_create();
+            }
+        }
+
+        for (int i = 0; i < sz; i++) waitpid(processIds[i], NULL, 0);
+
+        free(line);
+        vector_destroy(&tokens);
+        vector_destroy(&command);
+    }
+
+    return 0;
+}
+*/
