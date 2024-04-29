@@ -259,7 +259,7 @@ int main(int argc, char *argv[]){
         // Separar la entrada en items
         items = parse_input(expression);
 
-        if(vector_get(&items, 0) == NULL){
+        if(vector_get(&items, 0) == NULL || vector_get(&items, 0) == "&"){
             continue;
         }
 
@@ -286,110 +286,3 @@ int main(int argc, char *argv[]){
 
     return 0;
 }
-
-/*
-int main (int argc, char* argv[]){
-    int in_exec;
-
-    FILE* input_file = NULL;
-    for (int i = 1; i < argc; i++) {
-        FILE* aux_file = fopen(argv[i], "r");
-        if (aux_file == NULL) {
-            print_error();
-            exit(1);
-        }
-
-        if (input_file == NULL) {
-            input_file = aux_file;
-        } else {
-            struct stat in_stat, aux_stat;
-            fstat(fileno(input_file), &in_stat);
-            fstat(fileno(aux_file), &aux_stat);
-            if (!(in_stat.st_dev == aux_stat.st_dev && in_stat.st_ino == aux_stat.st_ino)) {
-                print_error();
-                exit(1);
-            }
-        }
-    }
-
-    if (input_file != NULL) stdin = fdopen(fileno(input_file), "r");
-
-    vector_add(&PATH, "./");
-    vector_add(&PATH, "/usr/bin/");
-    vector_add(&PATH, "/bin/");
-
-        
-    while (1){
-        if (input_file == NULL) printf("wish> ");
-        char* line = NULL;
-        size_t n = 0;
-        int len = getline(&line, &n, stdin);
-        if (len == -1) {
-            if (input_file == NULL) continue;
-            break;
-        }
-        
-        line[len-1] = '\0';
-        Vector tokens = parse_input(line);
-        
-        int size = tokens.size;
-        int amper = 1;
-        for (int i = 0; i < size; i++) {
-            if (strcmp("&", vector_get(&tokens, i)) == 0) {
-                if (i == 0){
-                    amper = 0;
-                }
-                if (i != size-1 && strcmp("&", vector_get(&tokens, i+1)) == 0){
-                    amper = 0;
-                }
-            }
-        }
-
-        if (!amper) {
-            continue;
-        }   
-
-        int commandsCount = 1;
-        for (int i = 0; i < tokens.size; i++) {
-            if (strcmp("&", vector_get(&tokens, i)) == 0) commandsCount++;
-        }
-        Vector command = vector_create();
-        int processIds[commandsCount];
-        int sz = 0;
-        for (int i = 0; i < tokens.size; i++) {
-            if (strcmp("&", vector_get(&tokens, i)) != 0) {
-                vector_add(&command, vector_get(&tokens, i));
-            } else {
-                continue;
-            }
-            if (
-                i == tokens.size - 1 ||
-                strcmp("&", vector_get(&tokens, i+1)) == 0
-            ) {
-                if (!is_valid_redirection(command)) {
-                    // Intentar ejecutar un comando interno (revisar si es un comando interno)
-                    print_error();
-                    break;
-                }
-                in_exec = handle_builtin_commands(command);
-                int res = -1;
-                if(!in_exec){
-                    res = handle_external_commands(command);
-                }                 
-                if (res != -1){
-                    processIds[sz++] = res;
-                } 
-                command = vector_create();
-            }
-        }
-
-        for (int i = 0; i < sz; i++) waitpid(processIds[i], NULL, 0);
-
-        free(line);
-        vector_destroy(&tokens);
-        vector_destroy(&command);
-    }
-
-    return 0;
-}
-*/
