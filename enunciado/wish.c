@@ -36,17 +36,9 @@ void vector_add(Vector* v, char *str){
     v->data[v->size++] = str;
 }
 
-void vector_remove_last(Vector* v){
-    if (v->size > 0) v->size--;
-}
-
 char *vector_get(Vector* v, int index){
     if (index < 0 || index >= v->size) return NULL;
     return v->data[index];
-}
-
-int vector_get_size(Vector *v){
-    return v->size;
 }
 
 int vector_get_index(Vector *v, char *val){
@@ -136,8 +128,8 @@ int handle_builtin_commands(Vector items){
     return 0;
 }
 
-int handle_external_commands(Vector items){
-    char *command = vector_get(&items, 0);
+int handle_external_commands(Vector items, int i){
+    char *command = vector_get(&items, i);
     int pos = vector_get_index(&items, ">");
     if (pos == -1) {
         pos = items.size;
@@ -167,17 +159,6 @@ int handle_external_commands(Vector items){
 
     print_error();
     return -1;   
-}
-
-char *search_script(char *filename){
-    for (int i = 0; i < PATH.size; i++){
-        char *dir = (char*) malloc((strlen(vector_get(&PATH, i)) + strlen(filename) + 1) * sizeof(char));
-        snprintf(dir, strlen(vector_get(&PATH, i)) + strlen(filename) + 1, "%s%s", vector_get(&PATH, i), filename);
-        if(access(dir, X_OK) == 0){
-            return dir;
-        }
-    }
-    return NULL;
 }
 
 int is_valid_redirection (Vector items) {
@@ -259,26 +240,36 @@ int main(int argc, char *argv[]){
         // Separar la entrada en items
         items = parse_input(expression);
 
-        if(vector_get(&items, 0) == NULL || vector_get(&items, 0) == "&"){
+        if(vector_get(&items, 0) == NULL){
             continue;
         }
 
-        // Verificar si los items tienen una redireccion válida
-        if (is_valid_redirection(items)) {
-            // Intentar ejecutar un comando interno (revisar si es un comando interno)
-            in_exec = handle_builtin_commands(items);
+        for(int i = 0; i < items.size; i++){
+            if(strcmp(vector_get(&items, i), "&") == 0){
+                continue;
+            }else{
+                if(i == 0 || strcmp(vector_get(&items, i-1), "&") == 0){
+                    // Verificar si los items tienen una redireccion válida
+                    if (is_valid_redirection(items)) {
+                        // Intentar ejecutar un comando interno (revisar si es un comando interno)
+                        in_exec = handle_builtin_commands(items);
 
-            int pids;
-            // En caso contrario intentar ejecutar un externo
-            if(in_exec == 0){
-                pids = handle_external_commands(items);
-                if(pids != -1){
-                    waitpid(pids, NULL, 0);
+                        int pids;
+                        // En caso contrario intentar ejecutar un externo
+                        if(in_exec == 0){
+                            pids = handle_external_commands(items, i);
+                            if(pids != -1){
+                                waitpid(pids, NULL, 0);
+                            }
+                        }        
+                    } else {
+                        print_error();
+                    }
                 }
-            }        
-        } else {
-            print_error();
+                
+            }
         }
+        
 
         free(expression);
         vector_destroy(&items);
