@@ -128,8 +128,8 @@ int handle_builtin_commands(Vector items){
     return 0;
 }
 
-int handle_external_commands(Vector items, int i){
-    char *command = vector_get(&items, i);
+int handle_external_commands(Vector items){
+    char *command = vector_get(&items, 0);
     int pos = vector_get_index(&items, ">");
     if (pos == -1) {
         pos = items.size;
@@ -177,8 +177,8 @@ int is_valid_redirection (Vector items) {
 }
 
 int main(int argc, char *argv[]){
-    int in_exec;
-    Vector items;
+    int in_exec, full_cmd;
+    Vector items, actual;
     char *expression = NULL;
 
     FILE *input_stream = NULL;
@@ -243,36 +243,52 @@ int main(int argc, char *argv[]){
         if(vector_get(&items, 0) == NULL){
             continue;
         }
+ 
+        actual = vector_create();
 
+        int pids[items.size];
+        int pid_count = 0;
         for(int i = 0; i < items.size; i++){
+            full_cmd = 0;
             if(strcmp(vector_get(&items, i), "&") == 0){
                 continue;
             }else{
-                if(i == 0 || strcmp(vector_get(&items, i-1), "&") == 0){
-                    // Verificar si los items tienen una redireccion válida
-                    if (is_valid_redirection(items)) {
-                        // Intentar ejecutar un comando interno (revisar si es un comando interno)
-                        in_exec = handle_builtin_commands(items);
-
-                        int pids;
-                        // En caso contrario intentar ejecutar un externo
-                        if(in_exec == 0){
-                            pids = handle_external_commands(items, i);
-                            if(pids != -1){
-                                waitpid(pids, NULL, 0);
-                            }
-                        }        
+                char *pos_act;
+                while(!full_cmd && i < items.size){
+                    pos_act = vector_get(&items, i);
+                    if (strcmp(pos_act, "&") != 0){
+                        //printf("Añadiendo %s a actual\n", pos_act);
+                        vector_add(&actual, pos_act);
+                        i++;
                     } else {
-                        print_error();
+                        full_cmd = 1;
                     }
                 }
-                
+                // Verificar si los items tienen una redireccion válida
+                if (is_valid_redirection(actual)) {
+                    // Intentar ejecutar un comando interno (revisar si es un comando interno)
+                    in_exec = handle_builtin_commands(actual);
+
+                        
+                    // En caso contrario intentar ejecutar un externo
+                    if(in_exec == 0){
+                        pids[pid_count] = handle_external_commands(actual);
+                        pid_count++;
+                    }        
+                } else {
+                    print_error();
+                }
+                full_cmd = 0;
+                actual = vector_create();
             }
         }
-        
+        for(int i = 0; i < pid_count; i++){
+            waitpid(pids[i], NULL, 0);
+        }
 
         free(expression);
         vector_destroy(&items);
+        vector_destroy(&actual);
     }
 
     return 0;
