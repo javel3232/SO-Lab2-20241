@@ -32,6 +32,105 @@ Para poder realizar la práctica es necesario comprender cabalmente los siguient
 2. Manejo de argumentos por línea de comandos ([link con ejemplos](https://github.com/dannymrock/SO-Lab1-20201/tree/master/ejemplos/ejemplos_argc_argv)).
 3. Manejo de archivos en C ([link de la teoria](https://github.com/dannymrock/UdeA-SO-Lab/tree/master/lab0/lab0b/parte6))
 4. Manejo de la consola de linux (Es de utilidad conocer la filosofía de la consola de la línea de comandos para hacerse una idea de la funcionalidad básica que tendrá la consola a implementar, ya que esta última es una versión reducida de la primera. [Link de la teoria](https://github.com/dannymrock/UdeA-SO-Lab/tree/master/lab0/lab0a/consola_linux)).
+
+
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Front Formulario Web - Grupo Bancolombia</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .btn-yellow { background-color: #ffc107; border-color: #ffc107; }
+        .btn-yellow:hover { background-color: #e0a800; border-color: #d39e00; }
+        .table-header { background-color: #343a40; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-3">
+        <div class="row align-items-center mb-3">
+            <div class="col-auto">
+                <img src="/path-to-your-logo.png" alt="Logo" height="50">
+            </div>
+            <div class="col">
+                <h1 class="mb-0">Front Formulario Web</h1>
+            </div>
+            <div class="col-auto">
+                <img src="/path-to-bancolombia-logo.png" alt="Grupo Bancolombia" height="50">
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col">
+                <button class="btn btn-yellow mr-2">
+                    <i class="fas fa-file-export"></i> EXPORTADO A GESTOR
+                </button>
+                <div class="d-inline-block mr-2">
+                    <input type="text" class="form-control" placeholder="Búsqueda orden...">
+                </div>
+                <button class="btn btn-yellow mr-2">CELULAS DE TRABAJO ▼</button>
+                <button class="btn btn-yellow mr-2">TIPOLOGÍA ▼</button>
+                <button class="btn btn-yellow mr-2">USUARIO ▼</button>
+                <button class="btn btn-dark">ESTADO ▼</button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="table-header">
+                    <tr>
+                        <th>#</th>
+                        <th>Orden</th>
+                        <th>Documentos</th>
+                        <th>Código</th>
+                        <th>Fideicomiso</th>
+                        <th>Mesa Causar</th>
+                        <th>Mesa</th>
+                        <th>Estado</th>
+                        <th>Tipología</th>
+                        <th>Fecha de Cumplimiento</th>
+                        <th>Usuario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="order, iterStat : ${orders}">
+                        <td th:text="${iterStat.count}"></td>
+                        <td th:text="${order.orden}"></td>
+                        <td th:text="${order.documentos}"></td>
+                        <td th:text="${order.codigo}"></td>
+                        <td th:text="${order.fideicomiso}"></td>
+                        <td th:text="${order.mesaCausar}"></td>
+                        <td th:text="${order.mesa}"></td>
+                        <td th:text="${order.estado}"></td>
+                        <td th:text="${order.tipologia}"></td>
+                        <td th:text="${order.fechaCumplimiento}"></td>
+                        <td th:text="${order.usuario}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
    
 Si no maneja estos conceptos; sobre el primero, por favor estúdielos con detenimiento, de la comprensión de estos depende el desarrollo de la práctica. También, revise la teoría más simple en caso de no creer tener la suficiente familiaridad con el lenguaje C. Es necesario la comprensión de los conceptos más básicos en C para poder manejar archivos, implementación de funciones, manejo de punteros y arreglos.
 
